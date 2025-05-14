@@ -1,6 +1,6 @@
 use fhe::bfv::{BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::*;
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, SeedableRng};
 use std::convert::TryFrom;
 use wasm_bindgen::prelude::*;
 
@@ -15,13 +15,17 @@ pub fn start() {
     console_error_panic_hook::set_once();
 }
 
-/// Generates FHE parameters and returns them as a serialized byte array
+/// Generates FHE parameters with custom settings and returns them as a serialized byte array
 #[wasm_bindgen]
-pub fn generate_parameters() -> Result<Box<[u8]>, JsValue> {
+pub fn generate_parameters_custom(
+    degree: usize,
+    moduli: Box<[u64]>,
+    plaintext_modulus: u64,
+) -> Result<Box<[u8]>, JsValue> {
     let parameters = BfvParametersBuilder::new()
-        .set_degree(2048)
-        .set_moduli(&[0x3fffffff000001])
-        .set_plaintext_modulus(1 << 10)
+        .set_degree(degree)
+        .set_moduli(&moduli)
+        .set_plaintext_modulus(plaintext_modulus)
         .build_arc()
         .map_err(|e| JsValue::from_str(&format!("Parameter building error: {}", e)))?;
 
@@ -32,15 +36,18 @@ pub fn generate_parameters() -> Result<Box<[u8]>, JsValue> {
     Ok(serialized.into_boxed_slice())
 }
 
-/// Generates a new secret key and returns it as a serialized byte array
+/// Generates FHE parameters with default settings and returns them as a serialized byte array
 #[wasm_bindgen]
-pub fn generate_secret_key_bytes() -> Result<Box<[u8]>, JsValue> {
-    let parameters = BfvParametersBuilder::new()
-        .set_degree(2048)
-        .set_moduli(&[0x3fffffff000001])
-        .set_plaintext_modulus(1 << 10)
-        .build_arc()
-        .map_err(|e| JsValue::from_str(&format!("Parameter building error: {}", e)))?;
+pub fn generate_parameters() -> Result<Box<[u8]>, JsValue> {
+    generate_parameters_custom(2048, Box::new([0x3fffffff000001]), 1 << 10)
+}
+
+/// Generates a new secret key using provided parameters and returns it as a serialized byte array
+#[wasm_bindgen]
+pub fn generate_secret_key_bytes(parameters_bytes: &[u8]) -> Result<Box<[u8]>, JsValue> {
+    // Deserialize the parameters
+    let parameters = bincode::deserialize(parameters_bytes)
+        .map_err(|e| JsValue::from_str(&format!("Parameters deserialization error: {}", e)))?;
 
     let mut rng = StdRng::from_entropy();
     let secret_key = SecretKey::random(&parameters, &mut rng);
@@ -50,6 +57,13 @@ pub fn generate_secret_key_bytes() -> Result<Box<[u8]>, JsValue> {
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))?;
 
     Ok(serialized.into_boxed_slice())
+}
+
+/// Generates a new secret key with default parameters and returns it as a serialized byte array
+#[wasm_bindgen]
+pub fn generate_secret_key_bytes_default() -> Result<Box<[u8]>, JsValue> {
+    let parameters_bytes = generate_parameters()?;
+    generate_secret_key_bytes(&parameters_bytes)
 }
 
 /// Generates a public key from a secret key
@@ -173,7 +187,7 @@ mod tests {
         let parameters_bytes = generate_parameters().unwrap();
 
         // Generate a secret key
-        let secret_key_bytes = generate_secret_key_bytes().unwrap();
+        let secret_key_bytes = generate_secret_key_bytes_default().unwrap();
 
         // Generate a public key from the secret key
         let public_key_bytes = generate_public_key_bytes(&secret_key_bytes).unwrap();
@@ -198,7 +212,7 @@ mod tests {
         let parameters_bytes = generate_parameters().unwrap();
 
         // Generate a secret key
-        let secret_key_bytes = generate_secret_key_bytes().unwrap();
+        let secret_key_bytes = generate_secret_key_bytes_default().unwrap();
 
         // Encrypt a value with the secret key
         let original_value = 123;
