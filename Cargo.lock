@@ -1060,7 +1060,7 @@ dependencies = [
 [[package]]
 name = "pulp"
 version = "0.18.9"
-source = "git+https://github.com/ashu-t3/pulp.git#5fbbe9b1641898d96df861ee429156076fa82698"
+source = "git+https://github.com/ashu-t3/pulp#5fbbe9b1641898d96df861ee429156076fa82698"
 dependencies = [
  "bytemuck",
  "libm",
