@@ -550,6 +550,7 @@ dependencies = [
  "fhe-util",
  "getrandom 0.2.16",
  "js-sys",
+ "once_cell",
  "pulp 0.18.9",
  "rand",
  "serde",
