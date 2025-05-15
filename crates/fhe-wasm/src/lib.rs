@@ -14,7 +14,7 @@ static PARAMETER_CACHE: Lazy<Mutex<HashMap<u32, Arc<fhe::bfv::BfvParameters>>>> 
 // Counter for generating unique IDs
 static NEXT_PARAM_ID: Lazy<Mutex<u32>> = Lazy::new(|| Mutex::new(1));
 
-// Predefined constant parameters for different security levels
+// Predefined constant parameters for different security levels (??-bit)
 static DEFAULT_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
     BfvParametersBuilder::new()
         .set_degree(2048)
@@ -24,11 +24,11 @@ static DEFAULT_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
         .expect("Failed to build default parameters")
 });
 
-// Higher security parameters (128-bit)
+// Higher security parameters (??-bit)
 static SECURE_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
     BfvParametersBuilder::new()
         .set_degree(4096)
-        .set_moduli(&[0x3fffffff000001, 0x3ffffffef40001])
+        .set_moduli(&[0x3fffffff000001])
         .set_plaintext_modulus(1 << 10)
         .build_arc()
         .expect("Failed to build secure parameters")
@@ -177,6 +177,7 @@ pub fn generate_parameters_custom(
 }
 
 /// Generates FHE parameters with default settings and returns them as a serialized byte array
+/// Note: Configured to provide mimimum security
 /// (Todo): Look into the security of these parameters
 #[wasm_bindgen]
 pub fn generate_parameters() -> Result<Box<[u8]>, JsValue> {
@@ -346,11 +347,27 @@ pub fn generate_secret_key_with_default_params() -> Box<[u8]> {
 }
 
 /// Encrypts a value using the predefined default parameters and a public key
+/// Note: We check if the plaintext value is in the range of the symmetric field being encoded
+/// i.e -512 to 511
 #[wasm_bindgen]
 pub fn encrypt_with_default_parameters(
     value: i64,
     public_key_bytes: &[u8],
 ) -> Result<Box<[u8]>, JsValue> {
+    // Validate the input value range
+    let plaintext_modulus = (**DEFAULT_PARAMETERS).plaintext();
+    let half_modulus = (plaintext_modulus / 2) as i64;
+
+    if value < -half_modulus || value >= half_modulus {
+        return Err(JsValue::from_str(&format!(
+            "Value {} outside valid range of {} to {}. Values will be wrapped around modulo {}.",
+            value,
+            -half_modulus,
+            half_modulus - 1,
+            plaintext_modulus
+        )));
+    }
+
     // Deserialize the public key
     let public_key: PublicKey = bincode::deserialize(public_key_bytes)
         .map_err(|e| JsValue::from_str(&format!("Public key deserialization error: {}", e)))?;
@@ -374,6 +391,34 @@ pub fn encrypt_with_default_parameters(
     Ok(serialized.into_boxed_slice())
 }
 
+#[wasm_bindgen]
+pub fn decrypt_with_default_parameters(
+    ciphertext_bytes: &[u8],
+    secret_key_bytes: &[u8],
+) -> Result<i64, JsValue> {
+    // Deserialize the secret key and ciphertext
+    let secret_key: SecretKey = bincode::deserialize(secret_key_bytes)
+        .map_err(|e| JsValue::from_str(&format!("Secret key deserialization error: {}", e)))?;
+
+    let ciphertext: Ciphertext = bincode::deserialize(ciphertext_bytes)
+        .map_err(|e| JsValue::from_str(&format!("Ciphertext deserialization error: {}", e)))?;
+
+    // Decrypt the ciphertext
+    let plaintext = secret_key
+        .try_decrypt(&ciphertext)
+        .map_err(|e| JsValue::from_str(&format!("Decryption error: {}", e)))?;
+
+    // Decode the plaintext using the same encoding and parameters used for encryption
+    let values = Vec::<i64>::try_decode(&plaintext, Encoding::poly())
+        .map_err(|e| JsValue::from_str(&format!("Decoding error: {}", e)))?;
+
+    // Extract the first value
+    if values.is_empty() {
+        return Err(JsValue::from_str("No values found in decrypted plaintext"));
+    }
+
+    Ok(values[0] as i64)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,5 +469,44 @@ mod tests {
 
         // Check that the decrypted value matches the original
         assert_eq!(decrypted_value, original_value);
+    }
+
+    #[test]
+    #[wasm_bindgen_test]
+    fn test_default_parameters_encryption() {
+        // Generate a secret key using default parameters
+        let secret_key_bytes = generate_secret_key_with_default_params();
+
+        // Generate a public key from the secret key
+        let public_key_bytes = generate_public_key_bytes(&secret_key_bytes).unwrap();
+
+        // Encrypt a value with the public key using default parameters
+        //Note: Default parameters are modulo 2^10 i.e 1024 then the plaintext value should be in the range of the symmetric field being encoded i.e -512 to 511
+        let original_value = 235;
+        let ciphertext_bytes =
+            encrypt_with_default_parameters(original_value, &public_key_bytes).unwrap();
+
+        // Decrypt using the specialized function
+        let decrypted_value =
+            decrypt_with_default_parameters(&ciphertext_bytes, &secret_key_bytes).unwrap();
+
+        // Check that the decrypted value matches the original
+        assert_eq!(decrypted_value, original_value);
+    }
+    #[test]
+    #[wasm_bindgen_test]
+    fn test_default_parameters_encryption_failure() {
+        // Generate a secret key using default parameters
+        let secret_key_bytes = generate_secret_key_with_default_params();
+
+        // Generate a public key from the secret key
+        let public_key_bytes = generate_public_key_bytes(&secret_key_bytes).unwrap();
+
+        // Encrypt a value with the public key using default parameters
+        //Note: Default parameters are modulo 2^10 i.e 1024 then the plaintext value should be in the range of the symmetric field being encoded i.e -512 to 511
+        let original_value = 789;
+        let ciphertext_bytes = encrypt_with_default_parameters(original_value, &public_key_bytes);
+
+        assert!(ciphertext_bytes.is_err());
     }
 }
