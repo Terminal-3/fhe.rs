@@ -102,9 +102,9 @@ checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bitflags"
-version = "2.9.0"
+version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
+checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
 name = "block-buffer"
@@ -986,7 +986,7 @@ dependencies = [
 [[package]]
 name = "pulp"
 version = "0.18.9"
-source = "git+https://github.com/ashu-t3/pulp.git#cfabe78df1523b56a9f0d208cef7104a203424c6"
+source = "git+https://github.com/Terminal-3/pulp.git#a01504740f704f647a2ae1f7bbd88069d8faedc4"
 dependencies = [
  "bytemuck",
  "libm",
