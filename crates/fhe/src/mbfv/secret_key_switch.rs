@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use fhe_math::{
-    rq::{traits::TryConvertFrom, Poly, Representation},
+    rq::{Poly, Representation, traits::TryConvertFrom},
     zq::Modulus,
 };
 use itertools::Itertools;
@@ -23,7 +23,7 @@ use super::Aggregate;
 /// Note: this protocol assumes the output key is split into the same number of
 /// parties as the input key, and is likely only useful for niche scenarios.
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize, Debug, Clone))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 
 pub struct SecretKeySwitchShare {

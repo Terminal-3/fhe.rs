@@ -1,0 +1,46 @@
+[package]
+name = "fhe-wasm"
+version = "0.1.0-beta.8"
+description = "A WebAssembly library for Client side Fully Homomorphic Encryption"
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+
+[dependencies]
+fhe-traits = { version = "^0.1.0-beta.8", path = "../fhe-traits" }
+fhe-util = { version = "^0.1.0-beta.8", path = "../fhe-util" }
+fhe = {version = "^0.1.0-beta.8", path = "../fhe", features = ["serde"]}
+wasm-bindgen.workspace = true
+js-sys.workspace = true
+console_error_panic_hook = { workspace = true, optional = true }
+wee_alloc = { workspace = true, optional = true }
+anyhow.workspace = true
+rand.workspace = true
+bincode.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+pulp.workspace = true
+once_cell.workspace = true
+
+[dev-dependencies]
+wasm-bindgen-test.workspace = true
+
+[features]
+default = ["console_error_panic_hook"]
+wee_alloc = ["dep:wee_alloc"]
+
+
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
+[dependencies.web-sys]
+version = "0.3"
+features = ["console", "Performance", "Window"]
