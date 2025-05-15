@@ -28,6 +28,11 @@ serde.workspace = true
 serde_json.workspace = true
 pulp.workspace = true
 once_cell.workspace = true
+[build-dependencies]
+fhe = { path = "../fhe", features = ["serde"] }  
+bincode.workspace = true
+
+
 
 [dev-dependencies]
 wasm-bindgen-test.workspace = true

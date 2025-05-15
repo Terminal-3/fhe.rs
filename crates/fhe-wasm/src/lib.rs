@@ -3,7 +3,7 @@ use fhe_traits::*;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashMap;
-use std::convert::TryFrom;
+
 use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
 
@@ -14,24 +14,18 @@ static PARAMETER_CACHE: Lazy<Mutex<HashMap<u32, Arc<fhe::bfv::BfvParameters>>>> 
 // Counter for generating unique IDs
 static NEXT_PARAM_ID: Lazy<Mutex<u32>> = Lazy::new(|| Mutex::new(1));
 
-// Predefined constant parameters for different security levels (??-bit)
+// Pre-built parameter bytes included in the binary
+static DEFAULT_PARAMETERS_BYTES: &[u8] = include_bytes!("prebuilt/default_params.bin");
+static SECURE_PARAMETERS_BYTES: &[u8] = include_bytes!("prebuilt/secure_params.bin");
+
+// Lazy deserializers that only deserialize when needed
 static DEFAULT_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
-    BfvParametersBuilder::new()
-        .set_degree(2048)
-        .set_moduli(&[0x3fffffff000001])
-        .set_plaintext_modulus(1 << 10)
-        .build_arc()
-        .expect("Failed to build default parameters")
+    bincode::deserialize(DEFAULT_PARAMETERS_BYTES)
+        .expect("Failed to deserialize default parameters")
 });
 
-// Higher security parameters (??-bit)
 static SECURE_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
-    BfvParametersBuilder::new()
-        .set_degree(4096)
-        .set_moduli(&[0x3fffffff000001])
-        .set_plaintext_modulus(1 << 10)
-        .build_arc()
-        .expect("Failed to build secure parameters")
+    bincode::deserialize(SECURE_PARAMETERS_BYTES).expect("Failed to deserialize secure parameters")
 });
 
 // Generate a new unique ID
@@ -321,17 +315,15 @@ pub fn decrypt_bytes(ciphertext_bytes: &[u8], secret_key_bytes: &[u8]) -> Result
 /// Gets the default predefined parameters as serialized bytes
 #[wasm_bindgen]
 pub fn get_default_parameters() -> Box<[u8]> {
-    let serialized =
-        bincode::serialize(&*DEFAULT_PARAMETERS).expect("Failed to serialize default parameters");
-    serialized.into_boxed_slice()
+    // Simply return the already serialized bytes
+    Box::from(DEFAULT_PARAMETERS_BYTES)
 }
 
 /// Gets the high-security predefined parameters as serialized bytes
 #[wasm_bindgen]
 pub fn get_secure_parameters() -> Box<[u8]> {
-    let serialized =
-        bincode::serialize(&*SECURE_PARAMETERS).expect("Failed to serialize secure parameters");
-    serialized.into_boxed_slice()
+    // Simply return the already serialized bytes
+    Box::from(SECURE_PARAMETERS_BYTES)
 }
 
 /// Generates a secret key using the predefined default parameters
@@ -508,5 +500,26 @@ mod tests {
         let ciphertext_bytes = encrypt_with_default_parameters(original_value, &public_key_bytes);
 
         assert!(ciphertext_bytes.is_err());
+    }
+    #[test]
+    #[wasm_bindgen_test]
+    fn test_prebuilt_parameters() {
+        // Get the pre-built parameters
+        let default_params_bytes = get_default_parameters();
+
+        // Generate a secret key with these parameters
+        let secret_key_bytes = generate_secret_key_bytes(&default_params_bytes).unwrap();
+
+        // Generate a public key
+        let public_key_bytes = generate_public_key_bytes(&secret_key_bytes).unwrap();
+
+        // Encrypt and decrypt to verify parameters work correctly
+        let value = 42;
+        let ciphertext_bytes =
+            encrypt_with_public_key_bytes(value, &public_key_bytes, &default_params_bytes).unwrap();
+
+        let decrypted = decrypt_bytes(&ciphertext_bytes, &secret_key_bytes).unwrap();
+
+        assert_eq!(value, decrypted);
     }
 }
