@@ -21,8 +21,8 @@ use zeroize_derive::{Zeroize, ZeroizeOnDrop};
 #[derive(Debug, PartialEq, Eq, Clone, Zeroize, ZeroizeOnDrop)]
 pub struct SecretKey {
     #[zeroize(skip)]
-    pub(crate) par: Arc<BfvParameters>,
-    pub(crate) coeffs: Box<[i64]>,
+    pub par: Arc<BfvParameters>,
+    pub coeffs: Box<[i64]>,
 }
 
 impl SecretKey {
