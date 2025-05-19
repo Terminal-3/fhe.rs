@@ -41,7 +41,7 @@ pub struct BfvParameters {
     pub(crate) variance: usize,
 
     /// Context for the underlying polynomials
-    pub(crate) ctx: Vec<Arc<Context>>,
+    pub ctx: Vec<Arc<Context>>,
 
     /// Ntt operator for the SIMD plaintext, if possible.
     pub(crate) op: Option<Arc<NttOperator>>,
@@ -115,14 +115,14 @@ impl BfvParameters {
     }
 
     /// Returns the context corresponding to the level.
-    pub(crate) fn ctx_at_level(&self, level: usize) -> Result<&Arc<Context>> {
+    pub fn ctx_at_level(&self, level: usize) -> Result<&Arc<Context>> {
         self.ctx
             .get(level)
             .ok_or_else(|| Error::DefaultError("No context".to_string()))
     }
 
     /// Returns the level of a given context
-    pub(crate) fn level_of_ctx(&self, ctx: &Arc<Context>) -> Result<usize> {
+    pub fn level_of_ctx(&self, ctx: &Arc<Context>) -> Result<usize> {
         self.ctx[0].niterations_to(ctx).map_err(Error::MathError)
     }
 
