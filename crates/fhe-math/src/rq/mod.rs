@@ -81,7 +81,8 @@ impl SubstitutionExponent {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Poly {
-    ctx: Arc<Context>,
+    /// Context of the polynomial.
+    pub ctx: Arc<Context>,
     representation: Representation,
     has_lazy_coefficients: bool,
     allow_variable_time_computations: bool,

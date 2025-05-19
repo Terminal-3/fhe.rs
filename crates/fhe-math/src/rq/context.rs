@@ -12,7 +12,8 @@ pub struct Context {
     pub(crate) q: Box<[Modulus]>,
     pub(crate) rns: Arc<RnsContext>,
     pub(crate) ops: Box<[NttOperator]>,
-    pub(crate) degree: usize,
+    /// Degree of the polynomial. Must be a power of two.
+    pub degree: usize,
     pub(crate) bitrev: Box<[usize]>,
     pub(crate) inv_last_qi_mod_qj: Box<[u64]>,
     pub(crate) inv_last_qi_mod_qj_shoup: Box<[u64]>,
