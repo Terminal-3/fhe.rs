@@ -85,8 +85,13 @@ pub struct Poly {
     representation: Representation,
     has_lazy_coefficients: bool,
     allow_variable_time_computations: bool,
-    coefficients: Array2<u64>,
-    coefficients_shoup: Option<Array2<u64>>,
+    /// Coefficients of the polynomial in RNS representation.
+    /// The first dimension is the number of moduli, the second is the degree.
+    ///
+    /// so the coefficients[i][j] is the coefficient of the polynomial in the
+    /// i-th modulus at the j-th power of x.
+    pub coefficients: Array2<u64>,
+    pub coefficients_shoup: Option<Array2<u64>>,
 }
 
 // Implements zeroization of polynomials
