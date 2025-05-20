@@ -146,6 +146,7 @@ pub fn generate_secret_key_with_stored_params(param_id: u32) -> Result<Box<[u8]>
 }
 
 /// Encrypts a value using a serialized public key and stored parameters
+/// Note: that operations actually happen modulo the plaintext_modulus
 #[wasm_bindgen]
 pub fn encrypt_with_stored_parameters(
     value: i64,
@@ -252,6 +253,7 @@ pub fn generate_public_key_bytes(secret_key_bytes: &[u8]) -> Result<Box<[u8]>, J
 }
 
 /// Encrypts a value using a serialized secret key and parameters
+/// Note: that operations actually happen modulo the plaintext_modulus
 #[wasm_bindgen]
 pub fn encrypt_with_secret_key_bytes(
     value: i64,
@@ -285,6 +287,7 @@ pub fn encrypt_with_secret_key_bytes(
 }
 
 /// Encrypts a value using a serialized public key and parameters
+/// Note: that operations actually happen modulo the plaintext_modulus
 #[wasm_bindgen]
 pub fn encrypt_with_public_key_bytes(
     value: i64,
@@ -373,8 +376,8 @@ pub fn generate_secret_key_with_default_params() -> Box<[u8]> {
 }
 
 /// Encrypts a value using the predefined default parameters and a public key
-/// Note: We check if the plaintext value is in the range of the symmetric field being encoded
-/// i.e -512 to 511
+///Note: that operations actually happen modulo the plaintext_modulus
+///Note: Default plaintext_modulus is 2048
 #[wasm_bindgen]
 pub fn encrypt_with_default_parameters(
     value: i64,
@@ -383,16 +386,6 @@ pub fn encrypt_with_default_parameters(
     // Validate the input value range
     let plaintext_modulus = (**DEFAULT_PARAMETERS).plaintext();
     let half_modulus = (plaintext_modulus / 2) as i64;
-
-    if value < -half_modulus || value >= half_modulus {
-        return Err(JsValue::from_str(&format!(
-            "Value {} outside valid range of {} to {}. Values will be wrapped around modulo {}.",
-            value,
-            -half_modulus,
-            half_modulus - 1,
-            plaintext_modulus
-        )));
-    }
 
     // Deserialize the public key
     let public_key: PublicKey = bincode::deserialize(public_key_bytes)
@@ -507,7 +500,7 @@ mod tests {
         let public_key_bytes = generate_public_key_bytes(&secret_key_bytes).unwrap();
 
         // Encrypt a value with the public key using default parameters
-        //Note: Default parameters are modulo 2^10 i.e 1024 then the plaintext value should be in the range of the symmetric field being encoded i.e -512 to 511
+
         let original_value = 235;
         let ciphertext_bytes =
             encrypt_with_default_parameters(original_value, &public_key_bytes).unwrap();
@@ -529,7 +522,7 @@ mod tests {
         let public_key_bytes = generate_public_key_bytes(&secret_key_bytes).unwrap();
 
         // Encrypt a value with the public key using default parameters
-        //Note: Default parameters are modulo 2^10 i.e 1024 then the plaintext value should be in the range of the symmetric field being encoded i.e -512 to 511
+
         let original_value = 789;
         let ciphertext_bytes = encrypt_with_default_parameters(original_value, &public_key_bytes);
 
