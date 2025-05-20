@@ -23,7 +23,10 @@ use super::Aggregate;
 /// Note: this protocol assumes the output key is split into the same number of
 /// parties as the input key, and is likely only useful for niche scenarios.
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize, Debug, Clone))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, Debug, Clone)
+)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 
 pub struct SecretKeySwitchShare {
@@ -32,6 +35,33 @@ pub struct SecretKeySwitchShare {
     // Probably doesn't need to be Arc in real usage but w/e
     pub(crate) ct: Arc<Ciphertext>,
     pub(crate) h_share: Poly,
+}
+
+pub fn secretkeyswitch_poly<R: RngCore + CryptoRng>(
+    s_in: &Poly,
+    s_out: &Poly,
+    ct: &Arc<Ciphertext>,
+    par: &Arc<BfvParameters>,
+    rng: &mut R,
+) -> Result<SecretKeySwitchShare> {
+    let e = Zeroizing::new(Poly::small(
+        ct[0].ctx(),
+        Representation::Ntt,
+        par.variance,
+        rng,
+    )?);
+
+    // Create h_i share
+    let mut h_share = s_in.as_ref() - s_out.as_ref();
+    h_share.disallow_variable_time_computations();
+    h_share *= &ct[1];
+    h_share += e.as_ref();
+
+    Ok(SecretKeySwitchShare {
+        par: par.clone(),
+        ct: ct.clone(),
+        h_share,
+    })
 }
 
 impl SecretKeySwitchShare {
@@ -73,22 +103,7 @@ impl SecretKeySwitchShare {
         )?);
         s_out.change_representation(Representation::Ntt);
 
-        // Sample error
-        // TODO this should be exponential in ciphertext noise!
-        let e = Zeroizing::new(Poly::small(
-            ct[0].ctx(),
-            Representation::Ntt,
-            par.variance,
-            rng,
-        )?);
-
-        // Create h_i share
-        let mut h_share = s_in.as_ref() - s_out.as_ref();
-        h_share.disallow_variable_time_computations();
-        h_share *= &ct[1];
-        h_share += e.as_ref();
-
-        Ok(Self { par, ct, h_share })
+        secretkeyswitch_poly(&s_in, &s_out, &ct, &par, rng)
     }
 }
 

@@ -98,7 +98,8 @@ impl SecretKey {
             false,
             Representation::PowerBasis,
         )?);
-        encrypt_poly(&mut s, p, rng, self.par.clone())
+        s.change_representation(Representation::Ntt);
+        encrypt_poly(&s, p, rng, self.par.clone())
     }
 }
 
@@ -121,7 +122,7 @@ impl FheEncrypter<Plaintext, Ciphertext> for SecretKey {
 }
 
 pub fn encrypt_poly<R: RngCore + CryptoRng>(
-    s: &mut Poly,
+    s: &Poly,
     p: &Poly,
     rng: &mut R,
     par: Arc<BfvParameters>,
@@ -130,7 +131,6 @@ pub fn encrypt_poly<R: RngCore + CryptoRng>(
     let level = par.level_of_ctx(p.ctx())?;
     let mut seed = <ChaCha8Rng as SeedableRng>::Seed::default();
     thread_rng().fill(&mut seed);
-    s.change_representation(Representation::Ntt);
 
     let mut a = Poly::random_from_seed(p.ctx(), Representation::Ntt, seed);
     let a_s = Zeroizing::new(&a * s.as_ref());
@@ -154,12 +154,7 @@ pub fn encrypt_poly<R: RngCore + CryptoRng>(
     })
 }
 
-pub fn decrypt_poly(
-    poly: &mut Poly,
-    ct: &Ciphertext,
-    par: Arc<BfvParameters>,
-) -> Result<Plaintext> {
-    poly.change_representation(Representation::Ntt);
+pub fn decrypt_poly(poly: &Poly, ct: &Ciphertext, par: Arc<BfvParameters>) -> Result<Plaintext> {
     let mut si = poly.clone();
 
     let mut c = Zeroizing::new(ct[0].clone());
@@ -222,7 +217,8 @@ impl FheDecrypter<Plaintext, Ciphertext> for SecretKey {
                 false,
                 Representation::PowerBasis,
             )?);
-            decrypt_poly(&mut s, ct, self.par.clone())
+            s.change_representation(Representation::Ntt);
+            decrypt_poly(&s, ct, self.par.clone())
             // s.change_representation(Representation::Ntt);
             // let mut si = s.clone();
 
