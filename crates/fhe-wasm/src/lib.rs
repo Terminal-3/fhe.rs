@@ -427,7 +427,7 @@ pub fn decrypt_with_default_parameters(
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
-
+    wasm_bindgen_test_configure!(run_in_browser);
     #[test]
     #[wasm_bindgen_test]
     fn test_encrypt_decrypt_cycle() {
