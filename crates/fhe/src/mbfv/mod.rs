@@ -14,4 +14,4 @@ pub use crp::CommonRandomPoly;
 pub use public_key_gen::PublicKeyShare;
 pub use public_key_switch::PublicKeySwitchShare;
 pub use relin_key_gen::{RelinKeyGenerator, RelinKeyShare};
-pub use secret_key_switch::{DecryptionShare, SecretKeySwitchShare};
+pub use secret_key_switch::{secretkeyswitch_poly, DecryptionShare, SecretKeySwitchShare};
