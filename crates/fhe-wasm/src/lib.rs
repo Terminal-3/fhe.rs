@@ -14,7 +14,7 @@ static PARAMETER_CACHE: Lazy<Mutex<HashMap<u32, Arc<fhe::bfv::BfvParameters>>>> 
 // Counter for generating unique IDs
 static NEXT_PARAM_ID: Lazy<Mutex<u32>> = Lazy::new(|| Mutex::new(1));
 
-// Predefined constant parameters for different security levels (??-bit)
+// 128-bit classical & PQ secure, depth-1:
 static DEFAULT_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
     BfvParametersBuilder::new()
         .set_degree(2048)
@@ -24,11 +24,15 @@ static DEFAULT_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
         .expect("Failed to build default parameters")
 });
 
-// Higher security parameters (??-bit)
+// 128-bit classical & PQ secure at n=4096:
 static SECURE_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
     BfvParametersBuilder::new()
         .set_degree(4096)
-        .set_moduli(&[0x3fffffff000001])
+        .set_moduli(&[
+            0x1FFFFFFFFF, // 37 bits
+            0x1FFFFFFEFF, // 37 bits
+            0x1FFFFFFDFF, // 37 bits; total ≈111 bits
+        ])
         .set_plaintext_modulus(1 << 10)
         .build_arc()
         .expect("Failed to build secure parameters")
