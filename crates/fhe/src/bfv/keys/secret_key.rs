@@ -86,47 +86,19 @@ impl SecretKey {
         Ok(noise)
     }
 
-    pub(crate) fn encrypt_poly<R: RngCore + CryptoRng>(
+    /// Encrypt with Poly type
+    pub fn encrypt_poly<R: RngCore + CryptoRng>(
         &self,
         p: &Poly,
         rng: &mut R,
     ) -> Result<Ciphertext> {
-        assert_eq!(p.representation(), &Representation::Ntt);
-
-        let level = self.par.level_of_ctx(p.ctx())?;
-
-        let mut seed = <ChaCha8Rng as SeedableRng>::Seed::default();
-        thread_rng().fill(&mut seed);
-
-        // Let's create a secret key with the ciphertext context
         let mut s = Zeroizing::new(Poly::try_convert_from(
             self.coeffs.as_ref(),
             p.ctx(),
             false,
             Representation::PowerBasis,
         )?);
-        s.change_representation(Representation::Ntt);
-
-        let mut a = Poly::random_from_seed(p.ctx(), Representation::Ntt, seed);
-        let a_s = Zeroizing::new(&a * s.as_ref());
-
-        let mut b = Poly::small(p.ctx(), Representation::Ntt, self.par.variance, rng)
-            .map_err(Error::MathError)?;
-        b -= &a_s;
-        b += p;
-
-        // It is now safe to enable variable time computations.
-        unsafe {
-            a.allow_variable_time_computations();
-            b.allow_variable_time_computations()
-        }
-
-        Ok(Ciphertext {
-            par: self.par.clone(),
-            seed: Some(seed),
-            c: vec![b, a],
-            level,
-        })
+        encrypt_poly(&mut s, p, rng, self.par.clone())
     }
 }
 
@@ -148,6 +120,92 @@ impl FheEncrypter<Plaintext, Ciphertext> for SecretKey {
     }
 }
 
+pub fn encrypt_poly<R: RngCore + CryptoRng>(
+    s: &mut Poly,
+    p: &Poly,
+    rng: &mut R,
+    par: Arc<BfvParameters>,
+) -> Result<Ciphertext> {
+    assert_eq!(p.representation(), &Representation::Ntt);
+    let level = par.level_of_ctx(p.ctx())?;
+    let mut seed = <ChaCha8Rng as SeedableRng>::Seed::default();
+    thread_rng().fill(&mut seed);
+    s.change_representation(Representation::Ntt);
+
+    let mut a = Poly::random_from_seed(p.ctx(), Representation::Ntt, seed);
+    let a_s = Zeroizing::new(&a * s.as_ref());
+
+    let mut b =
+        Poly::small(p.ctx(), Representation::Ntt, par.variance, rng).map_err(Error::MathError)?;
+    b -= &a_s;
+    b += p;
+
+    // It is now safe to enable variable time computations.
+    unsafe {
+        a.allow_variable_time_computations();
+        b.allow_variable_time_computations()
+    }
+
+    Ok(Ciphertext {
+        par: par.clone(),
+        seed: Some(seed),
+        c: vec![b, a],
+        level,
+    })
+}
+
+pub fn decrypt_poly(
+    poly: &mut Poly,
+    ct: &Ciphertext,
+    par: Arc<BfvParameters>,
+) -> Result<Plaintext> {
+    poly.change_representation(Representation::Ntt);
+    let mut si = poly.clone();
+
+    let mut c = Zeroizing::new(ct[0].clone());
+    c.disallow_variable_time_computations();
+
+    // Compute the phase c0 + c1*s + c2*s^2 + ... where the secret power
+    // s^k is computed on-the-fly
+    for i in 1..ct.len() {
+        let mut cis = Zeroizing::new(ct[i].clone());
+        cis.disallow_variable_time_computations();
+        *cis.as_mut() *= si.as_ref();
+        *c.as_mut() += &cis;
+        if i + 1 < ct.len() {
+            *si.as_mut() *= poly.as_ref();
+        }
+    }
+    c.change_representation(Representation::PowerBasis);
+
+    let d = Zeroizing::new(c.scale(&par.scalers[ct.level])?);
+
+    // TODO: Can we handle plaintext moduli that are BigUint?
+    let v = Zeroizing::new(
+        Vec::<u64>::from(d.as_ref())
+            .iter_mut()
+            .map(|vi| *vi + *par.plaintext)
+            .collect_vec(),
+    );
+    let mut w = v[..par.degree()].to_vec();
+    let q = Modulus::new(par.moduli[0]).map_err(Error::MathError)?;
+    q.reduce_vec(&mut w);
+    par.plaintext.reduce_vec(&mut w);
+
+    let mut s = Poly::try_convert_from(&w, ct[0].ctx(), false, Representation::PowerBasis)?;
+    s.change_representation(Representation::Ntt);
+
+    let pt = Plaintext {
+        par: par.clone(),
+        value: w.into_boxed_slice(),
+        encoding: None,
+        poly_ntt: s,
+        level: ct.level,
+    };
+
+    Ok(pt)
+}
+
 impl FheDecrypter<Plaintext, Ciphertext> for SecretKey {
     type Error = Error;
 
@@ -164,52 +222,54 @@ impl FheDecrypter<Plaintext, Ciphertext> for SecretKey {
                 false,
                 Representation::PowerBasis,
             )?);
-            s.change_representation(Representation::Ntt);
-            let mut si = s.clone();
+            decrypt_poly(&mut s, ct, self.par.clone())
+            // s.change_representation(Representation::Ntt);
+            // let mut si = s.clone();
 
-            let mut c = Zeroizing::new(ct[0].clone());
-            c.disallow_variable_time_computations();
+            // let mut c = Zeroizing::new(ct[0].clone());
+            // c.disallow_variable_time_computations();
 
-            // Compute the phase c0 + c1*s + c2*s^2 + ... where the secret power
-            // s^k is computed on-the-fly
-            for i in 1..ct.len() {
-                let mut cis = Zeroizing::new(ct[i].clone());
-                cis.disallow_variable_time_computations();
-                *cis.as_mut() *= si.as_ref();
-                *c.as_mut() += &cis;
-                if i + 1 < ct.len() {
-                    *si.as_mut() *= s.as_ref();
-                }
-            }
-            c.change_representation(Representation::PowerBasis);
+            // // Compute the phase c0 + c1*s + c2*s^2 + ... where the secret
+            // power // s^k is computed on-the-fly
+            // for i in 1..ct.len() {
+            //     let mut cis = Zeroizing::new(ct[i].clone());
+            //     cis.disallow_variable_time_computations();
+            //     *cis.as_mut() *= si.as_ref();
+            //     *c.as_mut() += &cis;
+            //     if i + 1 < ct.len() {
+            //         *si.as_mut() *= s.as_ref();
+            //     }
+            // }
+            // c.change_representation(Representation::PowerBasis);
 
-            let d = Zeroizing::new(c.scale(&self.par.scalers[ct.level])?);
+            // let d = Zeroizing::new(c.scale(&self.par.scalers[ct.level])?);
 
-            // TODO: Can we handle plaintext moduli that are BigUint?
-            let v = Zeroizing::new(
-                Vec::<u64>::from(d.as_ref())
-                    .iter_mut()
-                    .map(|vi| *vi + *self.par.plaintext)
-                    .collect_vec(),
-            );
-            let mut w = v[..self.par.degree()].to_vec();
-            let q = Modulus::new(self.par.moduli[0]).map_err(Error::MathError)?;
-            q.reduce_vec(&mut w);
-            self.par.plaintext.reduce_vec(&mut w);
+            // // TODO: Can we handle plaintext moduli that are BigUint?
+            // let v = Zeroizing::new(
+            //     Vec::<u64>::from(d.as_ref())
+            //         .iter_mut()
+            //         .map(|vi| *vi + *self.par.plaintext)
+            //         .collect_vec(),
+            // );
+            // let mut w = v[..self.par.degree()].to_vec();
+            // let q = Modulus::new(self.par.moduli[0]).
+            // map_err(Error::MathError)?; q.reduce_vec(&mut w);
+            // self.par.plaintext.reduce_vec(&mut w);
 
-            let mut poly =
-                Poly::try_convert_from(&w, ct[0].ctx(), false, Representation::PowerBasis)?;
-            poly.change_representation(Representation::Ntt);
+            // let mut poly =
+            //     Poly::try_convert_from(&w, ct[0].ctx(), false,
+            // Representation::PowerBasis)?;
+            // poly.change_representation(Representation::Ntt);
 
-            let pt = Plaintext {
-                par: self.par.clone(),
-                value: w.into_boxed_slice(),
-                encoding: None,
-                poly_ntt: poly,
-                level: ct.level,
-            };
+            // let pt = Plaintext {
+            //     par: self.par.clone(),
+            //     value: w.into_boxed_slice(),
+            //     encoding: None,
+            //     poly_ntt: poly,
+            //     level: ct.level,
+            // };
 
-            Ok(pt)
+            // Ok(pt)
         }
     }
 }
