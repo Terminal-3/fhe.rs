@@ -13,8 +13,17 @@ static PARAMETER_CACHE: Lazy<Mutex<HashMap<u32, Arc<fhe::bfv::BfvParameters>>>> 
 
 // Counter for generating unique IDs
 static NEXT_PARAM_ID: Lazy<Mutex<u32>> = Lazy::new(|| Mutex::new(1));
-
-// 128-bit classical & PQ secure, depth-1:
+/// Parameters for 128-bit classical and post-quantum security, suitable for depth-1 multiplicative circuits.
+///
+/// - Polynomial modulus degree \( n = 2048 \)
+/// - Ciphertext modulus \( q \approx 2^{55.78} \)
+/// - Plaintext modulus \( t = 2^{10} \)
+///
+/// Security Justification:
+/// - \( \log_2 q \approx 55.78 \) exceeds the minimum requirements for both classical (≥54) and post-quantum (≥53) security at \( n = 2048 \).
+///
+/// Performance Consideration:
+/// - Lower \( n \) offers better performance for applications requiring shallow circuit depths.
 static DEFAULT_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
     BfvParametersBuilder::new()
         .set_degree(2048)
@@ -24,7 +33,20 @@ static DEFAULT_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
         .expect("Failed to build default parameters")
 });
 
-// 128-bit classical & PQ secure at n=4096:
+/// Parameters for 128-bit classical and post-quantum security at higher polynomial modulus degree, suitable for deeper circuits.
+///
+/// - Polynomial modulus degree \( n = 4096 \)
+/// - Ciphertext modulus composed of three 37-bit primes:
+///     - \( q_1 = 0x1FFFFFFFFF \)
+///     - \( q_2 = 0x1FFFFFFEFF \)
+///     - \( q_3 = 0x1FFFFFFDFF \)
+/// - Plaintext modulus \( t = 2^{10} \)
+///
+/// Security Justification:
+/// - Combined \( \log_2 q \approx 111 \) meets the minimum requirements for both classical (≥111) and post-quantum (≥103) security at \( n = 4096 \).
+///
+/// Performance Consideration:
+/// - Higher \( n \) supports deeper circuits but may incur additional computational overhead.
 static SECURE_PARAMETERS: Lazy<Arc<fhe::bfv::BfvParameters>> = Lazy::new(|| {
     BfvParametersBuilder::new()
         .set_degree(4096)
