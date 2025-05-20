@@ -137,7 +137,8 @@ impl Aggregate<SecretKeySwitchShare> for Ciphertext {
 #[derive(Debug, PartialEq, Eq, Clone)]
 
 pub struct DecryptionShare {
-    pub(crate) sks_share: SecretKeySwitchShare,
+    /// The share of the secret key switch
+    pub sks_share: SecretKeySwitchShare,
 }
 
 impl DecryptionShare {
