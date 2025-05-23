@@ -5,6 +5,7 @@ use fhe::bfv::{
 };
 use fhe_math::rns::{RnsContext, ScalingFactor};
 use fhe_math::zq::primes::generate_prime;
+use fhe_traits::FheDecrypter;
 use fhe_traits::{FheEncoder, FheEncrypter};
 use itertools::Itertools;
 use num_bigint::BigUint;
@@ -49,6 +50,12 @@ pub fn bfv_benchmark(c: &mut Criterion) {
         let c2: Ciphertext = sk.try_encrypt(&pt2, &mut rng).unwrap();
 
         let q = par.moduli_sizes().iter().sum::<usize>();
+
+        // let's first make sure that decryption works
+        let dec_pt1 = sk.try_decrypt(&c1).unwrap();
+        assert_eq!(dec_pt1, pt1);
+        let dec_pt2 = sk.try_decrypt(&c2).unwrap();
+        assert_eq!(dec_pt2, pt2);
 
         group.bench_function(
             BenchmarkId::new("keygen_sk", format!("n={}/log(q)={}", par.degree(), q)),

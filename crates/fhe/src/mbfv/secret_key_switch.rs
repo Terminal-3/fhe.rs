@@ -204,6 +204,7 @@ impl Aggregate<DecryptionShare> for Plaintext {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use std::sync::Arc;
 
     use fhe_traits::{FheDecoder, FheEncoder, FheEncrypter};
@@ -269,6 +270,59 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn encrypt_decrypt_with_default_128() {
+        let mut rng = thread_rng();
+        let par = BfvParameters::default_parameters_128(20)[0].clone();
+        let crp = CommonRandomPoly::new(&par, &mut rng).unwrap();
+        let mut parties: Vec<Party> = vec![];
+        for _ in 0..NUM_PARTIES {
+            let sk_share = SecretKey::random(&par, &mut rng);
+            let pk_share = PublicKeyShare::new(&sk_share, crp.clone(), &mut rng).unwrap();
+            parties.push(Party { sk_share, pk_share })
+        }
+        let public_key =
+            PublicKey::from_shares(parties.iter().map(|p| p.pk_share.clone())).unwrap();
+
+        let pt1 = Plaintext::try_encode(
+            &par.plaintext.random_vec(par.degree(), &mut rng),
+            Encoding::poly_at_level(0),
+            &par,
+        )
+        .unwrap();
+        let ct = Arc::new(public_key.try_encrypt(&pt1, &mut rng).unwrap());
+
+        let decryption_shares = parties
+            .iter()
+            .map(|p| DecryptionShare::new(&p.sk_share, &ct, &mut rng));
+        let pt2 = Plaintext::from_shares(decryption_shares).unwrap();
+        assert_eq!(pt1, pt2);
+    }
+
+    #[test]
+    fn encrypt_decrypt_with_default_128_small_number() {
+        let mut rng = thread_rng();
+        let par = BfvParameters::default_parameters_128(20)[0].clone();
+        let crp = CommonRandomPoly::new(&par, &mut rng).unwrap();
+        let mut parties: Vec<Party> = vec![];
+        for _ in 0..NUM_PARTIES {
+            let sk_share = SecretKey::random(&par, &mut rng);
+            let pk_share = PublicKeyShare::new(&sk_share, crp.clone(), &mut rng).unwrap();
+            parties.push(Party { sk_share, pk_share })
+        }
+        let public_key =
+            PublicKey::from_shares(parties.iter().map(|p| p.pk_share.clone())).unwrap();
+
+        let pt1 = Plaintext::try_encode(&(1..16u64).collect_vec(), Encoding::simd(), &par).unwrap();
+        let ct = Arc::new(public_key.try_encrypt(&pt1, &mut rng).unwrap());
+
+        let decryption_shares = parties
+            .iter()
+            .map(|p| DecryptionShare::new(&p.sk_share, &ct, &mut rng));
+        let pt2 = Plaintext::from_shares(decryption_shares).unwrap();
+        assert_eq!(pt1, pt2);
     }
 
     #[test]
