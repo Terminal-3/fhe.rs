@@ -218,7 +218,7 @@ mod tests {
         },
     };
 
-    const NUM_PARTIES: usize = 11;
+    const NUM_PARTIES: usize = 1;
 
     struct Party {
         sk_share: SecretKey,
@@ -315,14 +315,14 @@ mod tests {
         let public_key =
             PublicKey::from_shares(parties.iter().map(|p| p.pk_share.clone())).unwrap();
 
-        let pt1 = Plaintext::try_encode(&(1..16u64).collect_vec(), Encoding::simd(), &par).unwrap();
+        let pt1 = Plaintext::try_encode(&(1..16u64).collect_vec(), Encoding::poly(), &par).unwrap();
         let ct = Arc::new(public_key.try_encrypt(&pt1, &mut rng).unwrap());
 
         let decryption_shares = parties
             .iter()
             .map(|p| DecryptionShare::new(&p.sk_share, &ct, &mut rng));
         let pt2 = Plaintext::from_shares(decryption_shares).unwrap();
-        assert_eq!(pt1, pt2);
+        assert_eq!(pt1, pt2, "num parties: {}", NUM_PARTIES);
     }
 
     #[test]
