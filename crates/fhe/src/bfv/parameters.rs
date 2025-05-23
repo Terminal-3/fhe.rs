@@ -22,10 +22,10 @@ use std::sync::Arc;
 #[derive(PartialEq, Eq)]
 pub struct BfvParameters {
     /// Number of coefficients in a polynomial.
-    polynomial_degree: usize,
+    pub polynomial_degree: usize,
 
     /// Modulus of the plaintext.
-    plaintext_modulus: u64,
+    pub plaintext_modulus: u64,
 
     /// Vector of coprime moduli q_i for the ciphertext.
     /// One and only one of `ciphertext_moduli` or `ciphertext_moduli_sizes`
