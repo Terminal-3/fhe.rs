@@ -23,10 +23,7 @@ use super::Aggregate;
 /// Note: this protocol assumes the output key is split into the same number of
 /// parties as the input key, and is likely only useful for niche scenarios.
 
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, Debug, Clone)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 
 pub struct SecretKeySwitchShare {
@@ -37,6 +34,11 @@ pub struct SecretKeySwitchShare {
     pub(crate) h_share: Poly,
 }
 
+/// Generate a share of the secret key switch polynomial
+///
+/// 1. *Private input*: BFV input secret key share
+/// 2. *Private input*: BFV output secret key share
+/// 3. *Public input*: Input ciphertext to keyswitch
 pub fn secretkeyswitch_poly<R: RngCore + CryptoRng>(
     s_in: &Poly,
     s_out: &Poly,
