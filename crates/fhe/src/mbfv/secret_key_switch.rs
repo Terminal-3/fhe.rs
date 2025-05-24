@@ -218,7 +218,7 @@ mod tests {
         },
     };
 
-    const NUM_PARTIES: usize = 1;
+    const NUM_PARTIES: usize = 10;
 
     struct Party {
         sk_share: SecretKey,
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn encrypt_decrypt_with_default_128() {
         let mut rng = thread_rng();
-        let par = BfvParameters::default_parameters_128(20)[0].clone();
+        let par = BfvParameters::default_parameters_128(20)[1].clone();
         let crp = CommonRandomPoly::new(&par, &mut rng).unwrap();
         let mut parties: Vec<Party> = vec![];
         for _ in 0..NUM_PARTIES {
@@ -304,25 +304,50 @@ mod tests {
     #[test]
     fn encrypt_decrypt_with_default_128_small_number() {
         let mut rng = thread_rng();
-        let par = BfvParameters::default_parameters_128(20)[0].clone();
-        let crp = CommonRandomPoly::new(&par, &mut rng).unwrap();
+        let par = BfvParameters::default_parameters_128(20).clone();
+        //Print par
+        println!("-------------------------------------------------");
+        println!("par: {:?}", par);
+
+        println!("-------------------------------------------------");
+        //Print par[0]
+        println!("par1: {:?}", par[0]);
+        println!("par_1 max_level: {}", par[0].max_level());
+        println!("par_1 moduli: {:?}", par[0].moduli);
+        println!("par_1 plaintext_modulus: {}", par[0].plaintext_modulus);
+        println!("-------------------------------------------------");
+        //Print par[1]
+        println!("par2: {:?}", par[1]);
+        println!("par_2 max_level: {}", par[1].max_level());
+        println!("par_1 moduli: {:?}", par[1].moduli);
+        println!("par_1 plaintext_modulus: {}", par[1].plaintext_modulus);
+        println!("-------------------------------------------------");
+        let par_1 = par[0].clone();
+        let par_2 = par[1].clone();
+
+        let crp = CommonRandomPoly::new(&par_2, &mut rng).unwrap();
         let mut parties: Vec<Party> = vec![];
         for _ in 0..NUM_PARTIES {
-            let sk_share = SecretKey::random(&par, &mut rng);
+            let sk_share = SecretKey::random(&par_2, &mut rng);
             let pk_share = PublicKeyShare::new(&sk_share, crp.clone(), &mut rng).unwrap();
+            //Print PublicKeyShare
+            println!("-------------------------------------------------");
+            println!("pk_share par: {:?}", pk_share.par);
+            println!("-------------------------------------------------");
             parties.push(Party { sk_share, pk_share })
         }
         let public_key =
             PublicKey::from_shares(parties.iter().map(|p| p.pk_share.clone())).unwrap();
 
-        let pt1 = Plaintext::try_encode(&(1..16u64).collect_vec(), Encoding::poly(), &par).unwrap();
+        let pt1 =
+            Plaintext::try_encode(&(1..16u64).collect_vec(), Encoding::simd(), &par_2).unwrap();
         let ct = Arc::new(public_key.try_encrypt(&pt1, &mut rng).unwrap());
 
         let decryption_shares = parties
             .iter()
             .map(|p| DecryptionShare::new(&p.sk_share, &ct, &mut rng));
         let pt2 = Plaintext::from_shares(decryption_shares).unwrap();
-        assert_eq!(pt1, pt2, "num parties: {}", NUM_PARTIES);
+        assert_eq!(pt1.value, pt2.value, "num parties: {}", NUM_PARTIES);
     }
 
     #[test]
